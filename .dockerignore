@@ -1,0 +1,5 @@
+Dockerfile
+s3test
+*.md
+.git/
+.idea/
