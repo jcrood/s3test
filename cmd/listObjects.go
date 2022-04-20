@@ -17,6 +17,7 @@ import (
 const delimiter = "/"
 const defaultObjectPrefix = "transient_BatchManagerCache/"
 const defaultTimeout = 50
+const defaultLimit = 1000
 
 var listObjectsCmd = &cobra.Command{
 	Use:   "listObjects",
@@ -32,6 +33,7 @@ var listObjectsCmd = &cobra.Command{
 		requestTimeout := viper.GetInt("timeout")
 		objectPrefix := viper.GetString("prefix")
 		debug := viper.GetBool("debug")
+		limit := viper.GetInt("limit")
 
 		if s3key == "" || s3secret == "" || s3endpoint == "" || s3bucket == "" {
 			log.Fatalf("missing params, abort!")
@@ -42,7 +44,7 @@ var listObjectsCmd = &cobra.Command{
 			log.Fatalf("failed to get s3 client: %v", err)
 		}
 
-		noFiles, err := listObjects(client, s3bucket, objectPrefix, time.Duration(requestTimeout)*time.Second)
+		noFiles, err := listObjects(client, s3bucket, objectPrefix, time.Duration(requestTimeout)*time.Second, limit)
 		if err != nil {
 			log.Fatalf("failed to listObjects: %v", err)
 		}
@@ -57,11 +59,14 @@ func init() {
 	listObjectsCmd.Flags().IntP("timeout", "t", defaultTimeout, "request timeout in seconds")
 	listObjectsCmd.Flags().StringP("prefix", "p", defaultObjectPrefix, "object prefix to use")
 	listObjectsCmd.Flags().Bool("debug", false, "enable debug mode")
+	listObjectsCmd.Flags().IntP("limit", "l", defaultLimit, "limit max-keys")
 	_ = viper.BindPFlag("timeout", listObjectsCmd.Flags().Lookup("timeout"))
 	_ = viper.BindPFlag("prefix", listObjectsCmd.Flags().Lookup("prefix"))
 	_ = viper.BindPFlag("debug", listObjectsCmd.Flags().Lookup("debug"))
+	_ = viper.BindPFlag("limit", listObjectsCmd.Flags().Lookup("limit"))
 	viper.SetDefault("timeout", defaultTimeout)
 	viper.SetDefault("prefix", defaultObjectPrefix)
+	viper.SetDefault("limit", defaultLimit)
 }
 
 const defaultRegion = "eu-west-3"
@@ -87,7 +92,7 @@ func getClient(s3key, s3secret, endpoint string, debugMode bool) (*s3.Client, er
 
 	cfg, err := config.LoadDefaultConfig(
 		context.TODO(),
-		configOptions...
+		configOptions...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create s3 config: %w", err)
@@ -100,7 +105,7 @@ func getClient(s3key, s3secret, endpoint string, debugMode bool) (*s3.Client, er
 	return client, nil
 }
 
-func listObjects(client *s3.Client, bucketName, prefix string, timeout time.Duration) (int, error) {
+func listObjects(client *s3.Client, bucketName, prefix string, timeout time.Duration, limit int) (int, error) {
 	ctx := context.TODO()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -110,6 +115,7 @@ func listObjects(client *s3.Client, bucketName, prefix string, timeout time.Dura
 		Prefix:       aws.String(prefix),
 		Delimiter:    aws.String(delimiter),
 		EncodingType: types.EncodingTypeUrl,
+		MaxKeys:      int32(limit),
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to list objects: %w", err)
