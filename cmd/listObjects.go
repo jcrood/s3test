@@ -110,7 +110,7 @@ func listObjects(client *s3.Client, bucketName, prefix string, timeout time.Dura
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	out, err := client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+	out, err := client.ListObjects(ctx, &s3.ListObjectsInput{
 		Bucket:       aws.String(bucketName),
 		Prefix:       aws.String(prefix),
 		Delimiter:    aws.String(delimiter),
@@ -121,5 +121,5 @@ func listObjects(client *s3.Client, bucketName, prefix string, timeout time.Dura
 		return 0, fmt.Errorf("failed to list objects: %w", err)
 	}
 
-	return int(out.KeyCount), nil
+	return len(out.Contents), nil
 }
